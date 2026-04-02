@@ -1,3 +1,4 @@
+#basically sets up everything needed to talk to PostgresSQL sb
 import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
@@ -12,7 +13,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     #sync changes to the DB, and uses bind to tell engine which database to connect to
     #returns db
 Base = declarative_base()
-    #what database models will inherit later
+    #what database models will inherit later, kind of creating Base class
 def get_db():
     db = SessionLocal() #opens a new db session, like connecting to the db
     try:
