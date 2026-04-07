@@ -5,7 +5,8 @@ services:
       - "8000:8000"
     env_file: .env
     depends_on: 
-      - db
+      db:
+        condition: service_healthy
   db:
     image: postgres:15-alpine #uses official postgres 15 image
     restart: always #if container crashes always restart
@@ -17,6 +18,11 @@ services:
       - "5432:5432" #maps port 5432 in container to port 5432 on machiine
     volumes:
       - db_data:/var/lib/postgresql/data #ensures data survives restarts
+    healthcheck: #makes sure that app is ready
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
 volumes:
   db_data:

@@ -3,7 +3,7 @@
 from database import Base
 from sqlalchemy import Column, Integer, String, Float, Text, DateTime
 from sqlalchemy.sql import func
-from sqlalchemy.sql import ForeignKey
+from sqlalchemy import ForeignKey
 
 #inherits from base in database.py so SQLAlchemy knows it's table
 class Sample(Base):
@@ -21,7 +21,7 @@ class Sample(Base):
 class Sequence(Base):
     __tablename__="sequence"
     id = Column(Integer, primary_key=True, index=True)
-    sample_id = Column(Integer, ForeignKey("samples.id"))
+    sample_id = Column(Integer, ForeignKey("sample.id"))
         #basically matches id form sequence table to sample table 
         #makes sure that sample row isn't created without seuqence
         #or vice versa
