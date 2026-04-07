@@ -1,0 +1,22 @@
+services:
+  app:
+    build: . #tells docker to build from dockerfile
+    ports:
+      - "8000:8000"
+    env_file: .env
+    depends_on: 
+      - db
+  db:
+    image: postgres:15-alpine #uses official postgres 15 image
+    restart: always #if container crashes always restart
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432" #maps port 5432 in container to port 5432 on machiine
+    volumes:
+      - db_data:/var/lib/postgresql/data #ensures data survives restarts
+
+volumes:
+  db_data:
