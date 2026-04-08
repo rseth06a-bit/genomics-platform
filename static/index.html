@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Genomics Platform</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=DM+Serif+Display&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0a0e0f;
+      --surface:  #111618;
+      --border:   #1e2a2d;
+      --accent:   #00e5a0;
+      --accent2:  #00aeff;
+      --warn:     #ff6b6b;
+      --text:     #d4e8e1;
+      --muted:    #4a6a60;
+      --mono:     'IBM Plex Mono', monospace;
+      --serif:    'DM Serif Display', serif;
+    }
+
+    html, body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--mono);
+      min-height: 100vh;
+      font-size: 14px;
+    }
+
+    /* subtle grid overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 40px 40px;
+      opacity: 0.35;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .app { position: relative; z-index: 1; max-width: 1000px; margin: 0 auto; padding: 40px 24px 80px; }
+
+    /* ── HEADER ── */
+    header { margin-bottom: 56px; }
+    .header-tag { font-size: 11px; letter-spacing: 0.18em; color: var(--accent); text-transform: uppercase; margin-bottom: 12px; }
+    h1 { font-family: var(--serif); font-size: clamp(32px, 5vw, 52px); line-height: 1.1; color: #fff; }
+    h1 span { color: var(--accent); }
+    .header-sub { margin-top: 12px; color: var(--muted); font-size: 12px; letter-spacing: 0.05em; }
+
+    /* ── PANELS ── */
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 28px;
+      margin-bottom: 24px;
+      animation: fadeUp 0.4s ease both;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .panel-title {
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .panel-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+    /* ── UPLOAD ZONE ── */
+    .drop-zone {
+      border: 1px dashed var(--muted);
+      border-radius: 4px;
+      padding: 48px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      position: relative;
+    }
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: var(--accent);
+      background: rgba(0, 229, 160, 0.04);
+    }
+    .drop-zone input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+    }
+    .drop-icon { font-size: 32px; margin-bottom: 12px; }
+    .drop-label { color: var(--muted); font-size: 12px; }
+    .drop-label strong { color: var(--accent); }
+    .file-chosen { margin-top: 12px; color: var(--text); font-size: 13px; }
+
+    /* ── BUTTONS ── */
+    .btn {
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 10px 22px;
+      border: 1px solid;
+      border-radius: 3px;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, opacity 0.15s;
+      background: transparent;
+    }
+    .btn-primary { border-color: var(--accent); color: var(--accent); }
+    .btn-primary:hover { background: var(--accent); color: var(--bg); }
+    .btn-secondary { border-color: var(--accent2); color: var(--accent2); }
+    .btn-secondary:hover { background: var(--accent2); color: var(--bg); }
+    .btn-danger { border-color: var(--warn); color: var(--warn); }
+    .btn-danger:hover { background: var(--warn); color: var(--bg); }
+    .btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    .btn-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 20px; }
+
+    /* ── STATUS BAR ── */
+    .status-bar {
+      font-size: 12px;
+      padding: 10px 14px;
+      border-radius: 3px;
+      margin-top: 16px;
+      display: none;
+    }
+    .status-bar.show { display: block; }
+    .status-bar.info  { background: rgba(0,174,255,0.08); border: 1px solid rgba(0,174,255,0.25); color: var(--accent2); }
+    .status-bar.ok    { background: rgba(0,229,160,0.08); border: 1px solid rgba(0,229,160,0.25); color: var(--accent); }
+    .status-bar.error { background: rgba(255,107,107,0.08); border: 1px solid rgba(255,107,107,0.25); color: var(--warn); }
+
+    /* ── STAT CHIPS ── */
+    .stat-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+    .stat-chip {
+      background: rgba(0,229,160,0.06);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 10px 18px;
+    }
+    .stat-chip .val { font-size: 22px; color: var(--accent); font-family: var(--serif); }
+    .stat-chip .lbl { font-size: 10px; letter-spacing: 0.1em; color: var(--muted); text-transform: uppercase; margin-top: 2px; }
+
+    /* ── SEQUENCE CARDS ── */
+    #sequences-container { display: flex; flex-direction: column; gap: 20px; }
+
+    .seq-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+      animation: fadeUp 0.3s ease both;
+    }
+    .seq-card-header {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .seq-id { font-size: 11px; color: var(--muted); }
+    .seq-body { padding: 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 600px) { .seq-body { grid-template-columns: 1fr; } }
+
+    /* ── PREDICTION BADGES ── */
+    .pred-grid { display: flex; flex-direction: column; gap: 10px; }
+    .pred-row { display: flex; align-items: center; gap: 10px; }
+    .pred-model { font-size: 10px; letter-spacing: 0.08em; color: var(--muted); width: 130px; flex-shrink: 0; }
+    .pred-label {
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 2px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .pred-label.healthy { background: rgba(0,229,160,0.15); color: var(--accent); border: 1px solid rgba(0,229,160,0.3); }
+    .pred-label.disease { background: rgba(255,107,107,0.15); color: var(--warn);   border: 1px solid rgba(255,107,107,0.3); }
+    .pred-conf { font-size: 11px; color: var(--muted); margin-left: auto; }
+
+    /* confidence bar */
+    .conf-bar-wrap { flex: 1; height: 4px; background: var(--border); border-radius: 2px; }
+    .conf-bar { height: 100%; border-radius: 2px; transition: width 0.6s ease; }
+    .conf-bar.healthy { background: var(--accent); }
+    .conf-bar.disease { background: var(--warn); }
+
+    /* ── CHART ── */
+    .chart-wrap { position: relative; height: 200px; }
+
+    /* ── TRAIN SECTION ── */
+    .train-result { margin-top: 16px; font-size: 13px; color: var(--accent); display: none; }
+    .train-result.show { display: block; }
+
+    /* ── SPINNER ── */
+    .spinner {
+      display: inline-block;
+      width: 12px; height: 12px;
+      border: 2px solid var(--muted);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="header-tag">// genomics platform v1.0</div>
+    <h1>Sequence<br/><span>Analysis</span></h1>
+    <p class="header-sub">FASTA upload · feature extraction · ML classification</p>
+  </header>
+
+  <!-- ── UPLOAD ── -->
+  <div class="panel">
+    <div class="panel-title">01 — Upload FASTA</div>
+
+    <div class="drop-zone" id="drop-zone">
+      <input type="file" id="file-input" accept=".fasta,.fa,.fna" />
+      <div class="drop-icon">🧬</div>
+      <div class="drop-label">Drop a <strong>.fasta / .fa / .fna</strong> file here, or click to browse</div>
+      <div class="file-chosen" id="file-chosen"></div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="upload-btn" disabled>Upload</button>
+    </div>
+
+    <div class="status-bar" id="upload-status"></div>
+  </div>
+
+  <!-- ── ANALYZE ── -->
+  <div class="panel">
+    <div class="panel-title">02 — Extract Features</div>
+    <p style="color:var(--muted);font-size:12px;margin-bottom:16px;">
+      Calculates GC content, sequence length, and k-mer frequencies for every uploaded sequence.
+    </p>
+
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <span style="font-size:12px;color:var(--muted);">Sample ID:</span>
+      <input
+        id="sample-id-input"
+        type="number"
+        placeholder="auto-filled after upload"
+        style="
+          background:var(--bg);border:1px solid var(--border);border-radius:3px;
+          color:var(--text);font-family:var(--mono);font-size:13px;
+          padding:8px 12px;width:200px;outline:none;
+        "
+      />
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="analyze-btn">Analyze</button>
+    </div>
+
+    <div class="status-bar" id="analyze-status"></div>
+  </div>
+
+  <!-- ── TRAIN ── -->
+  <div class="panel">
+    <div class="panel-title">03 — Train Models</div>
+    <p style="color:var(--muted);font-size:12px;margin-bottom:16px;">
+      Trains logistic regression, random forest, and a PyTorch neural network on all analyzed sequences in the database.
+    </p>
+    <div class="btn-row">
+      <button class="btn btn-secondary" id="train-btn">Train All Models</button>
+    </div>
+    <div class="status-bar" id="train-status"></div>
+    <div class="train-result" id="train-result"></div>
+  </div>
+
+  <!-- ── RESULTS ── -->
+  <div class="panel">
+    <div class="panel-title">04 — Results</div>
+
+    <div class="btn-row" style="margin-top:0;margin-bottom:20px;">
+      <button class="btn btn-primary" id="results-btn">Load Results</button>
+    </div>
+
+    <div class="status-bar" id="results-status"></div>
+
+    <div id="results-summary" style="display:none;">
+      <div class="stat-row" id="stat-row"></div>
+      <div id="sequences-container"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // ── STATE ──────────────────────────────────────────
+  let currentSampleId = null;
+  let selectedFile    = null;
+
+  // ── HELPERS ───────────────────────────────────────
+  function setStatus(id, msg, type) {
+    const el = document.getElementById(id);
+    el.className = `status-bar show ${type}`;
+    el.innerHTML = msg;
+  }
+  function clearStatus(id) {
+    const el = document.getElementById(id);
+    el.className = 'status-bar';
+    el.innerHTML = '';
+  }
+  function spinner() { return `<span class="spinner"></span>`; }
+
+  // ── DRAG & DROP ────────────────────────────────────
+  const dropZone  = document.getElementById('drop-zone');
+  const fileInput = document.getElementById('file-input');
+  const fileChosen = document.getElementById('file-chosen');
+  const uploadBtn  = document.getElementById('upload-btn');
+
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    const f = e.dataTransfer.files[0];
+    if (f) setFile(f);
+  });
+  fileInput.addEventListener('change', () => { if (fileInput.files[0]) setFile(fileInput.files[0]); });
+
+  function setFile(f) {
+    selectedFile = f;
+    fileChosen.textContent = `✓ ${f.name} (${(f.size / 1024).toFixed(1)} KB)`;
+    uploadBtn.disabled = false;
+    clearStatus('upload-status');
+  }
+
+  // ── UPLOAD ────────────────────────────────────────
+  uploadBtn.addEventListener('click', async () => {
+    if (!selectedFile) return;
+    uploadBtn.disabled = true;
+    setStatus('upload-status', `${spinner()} Uploading ${selectedFile.name}…`, 'info');
+
+    const form = new FormData();
+    form.append('file', selectedFile);
+
+    try {
+      const res  = await fetch('/api/upload', { method: 'POST', body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Upload failed');
+
+      currentSampleId = data.sample_id;
+      document.getElementById('sample-id-input').value = currentSampleId;
+
+      setStatus('upload-status',
+        `✓ Uploaded — sample ID <strong>${data.sample_id}</strong>, ` +
+        `<strong>${data.sequences_uploaded}</strong> sequences from <em>${data.filename}</em>`,
+        'ok'
+      );
+    } catch (err) {
+      setStatus('upload-status', `✗ ${err.message}`, 'error');
+    } finally {
+      uploadBtn.disabled = false;
+    }
+  });
+
+  // ── ANALYZE ───────────────────────────────────────
+  document.getElementById('analyze-btn').addEventListener('click', async () => {
+    const sid = document.getElementById('sample-id-input').value.trim();
+    if (!sid) { setStatus('analyze-status', '✗ Enter a sample ID first', 'error'); return; }
+
+    const btn = document.getElementById('analyze-btn');
+    btn.disabled = true;
+    setStatus('analyze-status', `${spinner()} Extracting features for sample ${sid}…`, 'info');
+
+    try {
+      const res  = await fetch(`/api/analyze/${sid}`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Analysis failed');
+      currentSampleId = parseInt(sid);
+      setStatus('analyze-status', `✓ Features extracted for <strong>${data}</strong> sequences`, 'ok');
+    } catch (err) {
+      setStatus('analyze-status', `✗ ${err.message}`, 'error');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  // ── TRAIN ─────────────────────────────────────────
+  document.getElementById('train-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('train-btn');
+    btn.disabled = true;
+    clearStatus('train-status');
+    document.getElementById('train-result').classList.remove('show');
+    setStatus('train-status', `${spinner()} Training models… this may take a moment`, 'info');
+
+    try {
+      const res  = await fetch('/api/train', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Training failed');
+
+      setStatus('train-status', `✓ Training complete`, 'ok');
+      const tr = document.getElementById('train-result');
+      tr.innerHTML = `Models trained on <strong>${data.samples_used}</strong> sequences — logistic_regression.pkl, random_forest.pkl, genomic_classifier.pt saved.`;
+      tr.classList.add('show');
+    } catch (err) {
+      setStatus('train-status', `✗ ${err.message}`, 'error');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  // ── RESULTS ───────────────────────────────────────
+  document.getElementById('results-btn').addEventListener('click', async () => {
+    const sid = document.getElementById('sample-id-input').value.trim() || currentSampleId;
+    if (!sid) { setStatus('results-status', '✗ Enter a sample ID first', 'error'); return; }
+
+    const btn = document.getElementById('results-btn');
+    btn.disabled = true;
+    setStatus('results-status', `${spinner()} Loading results for sample ${sid}…`, 'info');
+    document.getElementById('results-summary').style.display = 'none';
+
+    try {
+      const res  = await fetch(`/api/results/${sid}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to load results');
+
+      clearStatus('results-status');
+      renderResults(data);
+    } catch (err) {
+      setStatus('results-status', `✗ ${err.message}`, 'error');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  // ── RENDER ────────────────────────────────────────
+  function renderResults(data) {
+    const seqs = data.sequences || [];
+
+    // stats
+    const avgGC = seqs.length
+      ? (seqs.reduce((s, q) => s + (q.gc_content || 0), 0) / seqs.length * 100).toFixed(1)
+      : '—';
+    const diseaseCount  = seqs.filter(s => topPrediction(s) === 'disease').length;
+    const healthyCount  = seqs.filter(s => topPrediction(s) === 'healthy').length;
+
+    document.getElementById('stat-row').innerHTML = `
+      <div class="stat-chip"><div class="val">${seqs.length}</div><div class="lbl">Sequences</div></div>
+      <div class="stat-chip"><div class="val">${avgGC}%</div><div class="lbl">Avg GC Content</div></div>
+      <div class="stat-chip"><div class="val" style="color:var(--accent)">${healthyCount}</div><div class="lbl">Healthy</div></div>
+      <div class="stat-chip"><div class="val" style="color:var(--warn)">${diseaseCount}</div><div class="lbl">Disease</div></div>
+    `;
+
+    const container = document.getElementById('sequences-container');
+    container.innerHTML = '';
+
+    seqs.forEach((seq, i) => {
+      const card = buildSeqCard(seq, i);
+      container.appendChild(card);
+    });
+
+    document.getElementById('results-summary').style.display = 'block';
+
+    // draw charts after DOM is ready
+    seqs.forEach((seq, i) => {
+      if (seq.kmers) drawKmerChart(`chart-${i}`, seq.kmers);
+    });
+  }
+
+  function topPrediction(seq) {
+    if (!seq.predictions) return null;
+    const lr = seq.predictions.logistic_regression;
+    return lr ? lr.label : null;
+  }
+
+  function buildSeqCard(seq, i) {
+    const card = document.createElement('div');
+    card.className = 'seq-card';
+
+    const gcPct = seq.gc_content != null ? (seq.gc_content * 100).toFixed(1) + '%' : '—';
+    const len   = seq.seq_length  != null ? seq.seq_length.toLocaleString() + ' bp' : '—';
+
+    card.innerHTML = `
+      <div class="seq-card-header">
+        <span style="font-size:13px;color:var(--text)">Sequence #${seq.sequence_id}</span>
+        <span class="seq-id">GC: ${gcPct} &nbsp;·&nbsp; Length: ${len}</span>
+      </div>
+      <div class="seq-body">
+        <div>
+          <div style="font-size:10px;letter-spacing:0.1em;color:var(--muted);text-transform:uppercase;margin-bottom:12px;">K-mer Frequencies</div>
+          <div class="chart-wrap"><canvas id="chart-${i}"></canvas></div>
+        </div>
+        <div>
+          <div style="font-size:10px;letter-spacing:0.1em;color:var(--muted);text-transform:uppercase;margin-bottom:12px;">ML Predictions</div>
+          ${buildPredHTML(seq.predictions)}
+        </div>
+      </div>
+    `;
+    return card;
+  }
+
+  function buildPredHTML(preds) {
+    if (!preds) return `<span style="color:var(--muted);font-size:12px;">Models not trained yet — run training first</span>`;
+    if (preds.error) return `<span style="color:var(--warn);font-size:12px;">✗ ${preds.error}</span>`;
+
+    const models = [
+      { key: 'logistic_regression', label: 'Logistic Regression' },
+      { key: 'random_forest',       label: 'Random Forest' },
+      { key: 'pytorch',             label: 'PyTorch NN' },
+    ];
+
+    return `<div class="pred-grid">${models.map(m => {
+      const p = preds[m.key];
+      if (!p) return '';
+      const cls  = p.label === 'healthy' ? 'healthy' : 'disease';
+      const conf = Math.round((p.confidence || 0) * 100);
+      return `
+        <div class="pred-row">
+          <span class="pred-model">${m.label}</span>
+          <span class="pred-label ${cls}">${p.label}</span>
+          <div class="conf-bar-wrap"><div class="conf-bar ${cls}" style="width:${conf}%"></div></div>
+          <span class="pred-conf">${conf}%</span>
+        </div>`;
+    }).join('')}</div>`;
+  }
+
+  function drawKmerChart(canvasId, kmers) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+
+    // take top 12 k-mers by frequency
+    const sorted  = Object.entries(kmers).sort((a, b) => b[1] - a[1]).slice(0, 12);
+    const labels   = sorted.map(e => e[0]);
+    const values   = sorted.map(e => e[1]);
+    const maxVal   = Math.max(...values) || 1;
+
+    new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          data: values,
+          backgroundColor: values.map(v => {
+            const t = v / maxVal;
+            return `rgba(0, ${Math.round(100 + 129 * t)}, ${Math.round(160 * (1 - t) + 100)}, 0.75)`;
+          }),
+          borderWidth: 0,
+          borderRadius: 2,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: {
+          callbacks: { label: ctx => ` count: ${ctx.raw}` },
+          backgroundColor: '#111618',
+          borderColor: '#1e2a2d',
+          borderWidth: 1,
+          titleColor: '#00e5a0',
+          bodyColor: '#d4e8e1',
+        }},
+        scales: {
+          x: {
+            ticks: { color: '#4a6a60', font: { family: "'IBM Plex Mono'", size: 9 }, maxRotation: 45 },
+            grid:  { color: '#1e2a2d' }
+          },
+          y: {
+            ticks: { color: '#4a6a60', font: { family: "'IBM Plex Mono'", size: 9 } },
+            grid:  { color: '#1e2a2d' }
+          }
+        }
+      }
+    });
+  }
+</script>
+</body>
+</html>

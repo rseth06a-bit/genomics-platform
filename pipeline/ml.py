@@ -13,17 +13,13 @@ from sklearn.metrics import classification_report
 
 def load_features(db: Session):
     sequences = db.query(Sequence).filter(Sequence.gc_content != None).all()
-        #gives llist of all sequences in the db
-    seq_list=[]
-    labels_list=[]
+    gc_values = [seq.gc_content for seq in sequences]
+    median_gc = sorted(gc_values)[len(gc_values) // 2]
+    seq_list, labels_list = [], []
     for seq in sequences:
         seq_list.append(seq)
-        gc_content = seq.gc_content
-        if ((gc_content>=0.4) and (gc_content<=0.6)):
-            labels_list.append("healthy")
-        else:
-            labels_list.append("disease")
-    return(seq_list,labels_list)
+        labels_list.append("healthy" if seq.gc_content >= median_gc else "disease")
+    return seq_list, labels_list
 
 def build_feature_matrix(seq_list):
     vocab = set()
@@ -31,7 +27,8 @@ def build_feature_matrix(seq_list):
         kmer_dict = json.loads(seq.kmer_json)
         for key in kmer_dict.keys():
             vocab.add(key)
-    vocab = sorted(vocab)  
+    vocab = sorted(vocab)
+    joblib.dump(vocab, "vocab.pkl")  
     
     rows = []
     for seq in seq_list:
@@ -52,8 +49,6 @@ def train_sklearn_models(x,y):
     print("Random Forest:\n", classification_report(y_test, rf_clf.predict(X_test)))
     joblib.dump(model, 'logistic_regression.pkl')
     joblib.dump(rf_clf, 'random_forest.pkl')
-    joblib.dump(vocab, "vocab.pkl")         
-    joblib.dump(X.shape[1], "pytorch_input_size.pkl")
     return (model, rf_clf)
 
 class GenomicClassifier(nn.Module):
@@ -70,6 +65,7 @@ class GenomicClassifier(nn.Module):
         return self.fc3(x)
     
 def train_pytorch_model(X, y, epochs=50):
+    joblib.dump(X.shape[1], "pytorch_input_size.pkl")
     le = LabelEncoder()
     y_encoded = le.fit_transform(y)
     X_tensor = torch.FloatTensor(X)
